@@ -3,48 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WC Intelligence - Deep Scan</title>
+    <title>WC Intelligence - Deep Scan v3.5</title>
     <style>
         body{font-family:sans-serif; background:#f0f2f5; padding:20px; color:#1c1e21;}
         .card{background:#fff; max-width:850px; margin:0 auto; padding:25px; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,0.15); border-top: 6px solid #E8311A;}
         .header{margin-bottom:25px; display:flex; justify-content:space-between; align-items:center;}
         .input-group{display:flex; gap:12px; margin-bottom:20px; background:#f9f9f9; padding:15px; border-radius:8px;}
         input{flex:1; padding:14px; border:1px solid #ddd; border-radius:6px; font-size:14px; outline:none;}
-        button{padding:14px 28px; background:#28a745; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:13px; letter-spacing:0.5px;}
+        button{padding:14px 28px; background:#28a745; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:bold;}
         button:disabled{background:#a5d6a7; cursor:wait;}
         table{width:100%; border-collapse:collapse; margin-top:20px;}
         th{text-align:left; padding:15px; background:#f8f9fa; color:#65676b; font-size:11px; text-transform:uppercase;}
         td{padding:15px; border-bottom:1px solid #f0f2f5;}
         .price{font-weight:bold; color:#E8311A; font-size:16px;}
-        .status-msg{padding:12px; border-radius:6px; margin-bottom:15px; font-size:13px; border: 1px solid transparent; display:none;}
-        .loading{background:#e7f3ff; color:#0064d2; border-color:#d1e7ff; display:block;}
-        .error{background:#ffebe8; color:#d22129; border-color:#f7d0d1; display:block;}
+        .status-msg{padding:12px; border-radius:6px; margin-bottom:15px; font-size:13px; display:none; border:1px solid #ddd;}
+        .loading{background:#e7f3ff; color:#0064d2; display:block;}
+        .error{background:#ffebe8; color:#d22129; display:block;}
     </style>
 </head>
 <body>
 
 <div class="card">
     <div class="header">
-        <h2 style="color:#E8311A; margin:0; letter-spacing:-1px;">WELCOME CARS <span style="font-weight:normal; color:#999; font-size:14px;">| Price Radar</span></h2>
-        <div id="credits" style="font-size:11px; color:#888;">Verificando connessione...</div>
+        <h2 style="color:#E8311A; margin:0;">WELCOME CARS <span style="font-weight:normal; color:#999; font-size:14px;">| Radar</span></h2>
     </div>
 
     <div id="status" class="status-msg"></div>
 
     <div class="input-group">
-        <input type="text" id="urlInput" placeholder="Incolla l'URL della ricerca di DoYouSpain...">
-        <button id="btn" onclick="analizza()">SCANSIONA PREZZI</button>
+        <input type="text" id="urlInput" placeholder="Incolla l'URL lungo della ricerca (con le date)...">
+        <button id="btn" onclick="analizza()">SCANSIONA</button>
     </div>
 
     <table>
         <thead>
             <tr>
-                <th>Modello Competitor</th>
-                <th>Prezzo Migliore</th>
+                <th>Veicolo</th>
+                <th>Prezzo Totale</th>
             </tr>
         </thead>
         <tbody id="tbody">
-            <tr><td colspan="2" style="text-align:center; padding:50px; color:#bcc0c4;">Incolla l'URL e avvia la scansione profonda.</td></tr>
+            <tr><td colspan="2" style="text-align:center; padding:50px; color:#999;">Incolla l'URL e avvia.</td></tr>
         </tbody>
     </table>
 </div>
@@ -56,46 +55,58 @@ async function analizza() {
     const status = document.getElementById('status');
     const tbody = document.getElementById('tbody');
 
-    if(!input.value.includes('doyouspain.com')) return alert("Usa un link valido di DoYouSpain");
+    if(!input.value.includes('doyouspain.com')) return alert("Usa un URL valido di DoYouSpain");
 
     btn.disabled = true;
-    btn.innerText = "BYPASSING ANTI-BOT...";
-    status.innerText = "Inizializzazione browser remoto... (Attesa stimata: 35s)";
+    status.innerText = "Accesso sicuro in corso... Attendi 40 secondi.";
     status.className = "status-msg loading";
 
     const key = 'scp-live-a212e4678fcb47478232abf053202ddb';
-    
-    // Configurazione ESTREMA per DoYouSpain
     const params = new URLSearchParams({
         key: key,
         url: input.value,
-        render_js: true,
-        asp: true,
+        render_js: 'true',
+        asp: 'true',
         proxy_pool: 'public_residential',
         country: 'it',
-        wait_for_selector: '.car-result-card, .price-value, .total-price', // Aspetta che appaia almeno un prezzo
-        headers: 'User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        wait_for_selector: 'body' // Aspettiamo che la pagina sia caricata
     });
 
     try {
         const response = await fetch("https://api.scrapfly.io/scrape?" + params.toString());
         const data = await response.json();
-
-        if (data.status === "error") throw new Error("Scrapfly Block: " + data.error.message);
-
         const parser = new DOMParser();
         const doc = parser.parseFromString(data.content, 'text/html');
         
-        // Nuova ricerca prezzi basata sulla struttura invisibile del sito
-        const items = doc.querySelectorAll('.car-result-card, [class*="result-card"], [class*="car-item"]');
         let results = [];
 
+        // --- NUOVA LOGICA DI ESTRAZIONE UNIVERSALE ---
+        // Cerchiamo tutti i blocchi che potrebbero contenere un'auto
+        const items = doc.querySelectorAll('.car-result-card, [class*="result-card"], .te-car-card, .car-card');
+        
         items.forEach(item => {
-            const nome = item.querySelector('.car-name, h3, [class*="name"]')?.innerText || "Auto";
-            const pText = item.querySelector('.price-value, .total-price, .amount, [class*="price"]')?.innerText || "0";
-            const pNum = parseFloat(pText.replace(/[^0-9.,]/g, '').replace(',', '.'));
-            if(pNum > 5) results.push({n: nome.trim(), p: pNum});
+            const nome = item.querySelector('.car-name, h3, [class*="name"], .vehicle-name')?.innerText || "Auto";
+            // Cerchiamo il prezzo provando tutti i selettori conosciuti di DYSpain
+            const pText = item.querySelector('.price-value, .total-price, .amount, [class*="price"]')?.innerText;
+            
+            if(pText) {
+                const pNum = parseFloat(pText.replace(/[^0-9.,]/g, '').replace(',', '.'));
+                if(!isNaN(pNum) && pNum > 1) {
+                    results.push({n: nome.trim(), p: pNum});
+                }
+            }
         });
+
+        // Se non troviamo nulla con i selettori, cerchiamo "prezzi liberi" nella pagina
+        if(results.length === 0) {
+            const allPrices = doc.body.innerText.match(/\d+[\.,]\d{2}\s?€/g); // Cerca pattern tipo "45,00 €"
+            if(allPrices) {
+                allPrices.forEach((p, index) => {
+                    const val = parseFloat(p.replace(/[^0-9.,]/g, '').replace(',', '.'));
+                    results.push({n: "Competitor " + (index+1), p: val});
+                });
+            }
+        }
 
         if(results.length > 0) {
             results.sort((a,b) => a.p - b.p);
@@ -103,21 +114,21 @@ async function analizza() {
             results.forEach(r => {
                 tbody.innerHTML += `<tr><td>${r.n}</td><td class="price">${r.p.toFixed(2)} €</td></tr>`;
             });
-            status.innerText = `Scansione completata! Trovati ${results.length} competitor.`;
-            status.style.color = "#28a745";
+            status.innerText = "Trovate " + results.length + " offerte!";
+            status.className = "status-msg loading"; 
+            status.style.background = "#e8f5e9";
+            status.style.color = "#2e7d32";
         } else {
             status.className = "status-msg error";
-            status.innerText = "DoYouSpain ha bloccato il bot. Prova a rinfrescare la pagina di DoYouSpain e copia un nuovo URL.";
+            status.innerText = "DoYouSpain ha mostrato una pagina vuota. Prova a rifare la ricerca sul sito e copia l'URL di nuovo.";
         }
     } catch (e) {
         status.className = "status-msg error";
-        status.innerText = "Errore critico: " + e.message;
+        status.innerText = "Errore: " + e.message;
     } finally {
         btn.disabled = false;
-        btn.innerText = "SCANSIONA PREZZI";
     }
 }
 </script>
-
 </body>
 </html>
