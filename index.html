@@ -3,128 +3,121 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WC - Dashboard Live</title>
+    <title>WC Intelligence - Deep Scan</title>
     <style>
-        body{font-family:sans-serif; background:#f4f4f4; padding:20px; color:#333; line-height:1.4;}
-        .card{background:#fff; max-width:800px; margin:0 auto; padding:20px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.1);}
-        .header{border-bottom:2px solid #E8311A; margin-bottom:20px; padding-bottom:10px; display:flex; justify-content:space-between; align-items:center;}
-        .input-group{display:flex; gap:10px; margin-bottom:20px;}
-        input{flex:1; padding:12px; border:1px solid #ccc; border-radius:4px; font-size:14px;}
-        button{padding:12px 24px; background:#28a745; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition: 0.3s;}
-        button:hover{background:#218838;}
-        button:disabled{background:#ccc; cursor:not-allowed;}
-        table{width:100%; border-collapse:collapse; margin-top:20px; background: white;}
-        th, td{text-align:left; padding:12px; border-bottom:1px solid #eee;}
-        th{background:#f8f9fa; font-size:12px; color:#666; text-transform:uppercase;}
-        .price{font-weight:bold; color:#E8311A;}
-        .status{padding:10px; border-radius:4px; margin-bottom:10px; display:none; font-size:13px;}
-        .info{background:#e3f2fd; color:#0d47a1; display:block;}
-        .error{background:#ffebee; color:#c62828;}
+        body{font-family:sans-serif; background:#f0f2f5; padding:20px; color:#1c1e21;}
+        .card{background:#fff; max-width:850px; margin:0 auto; padding:25px; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,0.15); border-top: 6px solid #E8311A;}
+        .header{margin-bottom:25px; display:flex; justify-content:space-between; align-items:center;}
+        .input-group{display:flex; gap:12px; margin-bottom:20px; background:#f9f9f9; padding:15px; border-radius:8px;}
+        input{flex:1; padding:14px; border:1px solid #ddd; border-radius:6px; font-size:14px; outline:none;}
+        button{padding:14px 28px; background:#28a745; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:13px; letter-spacing:0.5px;}
+        button:disabled{background:#a5d6a7; cursor:wait;}
+        table{width:100%; border-collapse:collapse; margin-top:20px;}
+        th{text-align:left; padding:15px; background:#f8f9fa; color:#65676b; font-size:11px; text-transform:uppercase;}
+        td{padding:15px; border-bottom:1px solid #f0f2f5;}
+        .price{font-weight:bold; color:#E8311A; font-size:16px;}
+        .status-msg{padding:12px; border-radius:6px; margin-bottom:15px; font-size:13px; border: 1px solid transparent; display:none;}
+        .loading{background:#e7f3ff; color:#0064d2; border-color:#d1e7ff; display:block;}
+        .error{background:#ffebe8; color:#d22129; border-color:#f7d0d1; display:block;}
     </style>
 </head>
 <body>
 
 <div class="card">
     <div class="header">
-        <h2 style="color:#E8311A; margin:0;">WELCOME CARS</h2>
-        <span style="font-size:12px; color:#666;">v3.0 Live Deep Engine</span>
+        <h2 style="color:#E8311A; margin:0; letter-spacing:-1px;">WELCOME CARS <span style="font-weight:normal; color:#999; font-size:14px;">| Price Radar</span></h2>
+        <div id="credits" style="font-size:11px; color:#888;">Verificando connessione...</div>
     </div>
 
-    <div id="statusBox" class="status info">Pronto per l'analisi.</div>
+    <div id="status" class="status-msg"></div>
 
     <div class="input-group">
-        <input type="text" id="urlInput" placeholder="Incolla qui l'URL di DoYouSpain (es. do/list/en?...)">
-        <button id="btnAvvia" onclick="analizza()">AGGIORNA PREZZI</button>
+        <input type="text" id="urlInput" placeholder="Incolla l'URL della ricerca di DoYouSpain...">
+        <button id="btn" onclick="analizza()">SCANSIONA PREZZI</button>
     </div>
 
-    <table id="risultati">
+    <table>
         <thead>
             <tr>
-                <th>Modello Trovato</th>
-                <th>Prezzo Totale</th>
+                <th>Modello Competitor</th>
+                <th>Prezzo Migliore</th>
             </tr>
         </thead>
-        <tbody>
-            <tr><td colspan="2" style="text-align:center; padding:40px; color:#999;">Incolla l'URL e clicca sul tasto verde.</td></tr>
+        <tbody id="tbody">
+            <tr><td colspan="2" style="text-align:center; padding:50px; color:#bcc0c4;">Incolla l'URL e avvia la scansione profonda.</td></tr>
         </tbody>
     </table>
 </div>
 
 <script>
 async function analizza() {
-    const urlInput = document.getElementById('urlInput');
-    const btn = document.getElementById('btnAvvia');
-    const statusBox = document.getElementById('statusBox');
-    const tbody = document.querySelector('#risultati tbody');
+    const input = document.getElementById('urlInput');
+    const btn = document.getElementById('btn');
+    const status = document.getElementById('status');
+    const tbody = document.getElementById('tbody');
 
-    if(!urlInput.value.includes('doyouspain.com')) {
-        return alert("L'URL non sembra essere di DoYouSpain!");
-    }
+    if(!input.value.includes('doyouspain.com')) return alert("Usa un link valido di DoYouSpain");
 
-    // Reset UI
     btn.disabled = true;
-    btn.innerText = "ELABORAZIONE...";
-    statusBox.style.display = "block";
-    statusBox.className = "status info";
-    statusBox.innerText = "Connessione profonda con bypass anti-bot in corso... (può richiedere 30-40 secondi)";
+    btn.innerText = "BYPASSING ANTI-BOT...";
+    status.innerText = "Inizializzazione browser remoto... (Attesa stimata: 35s)";
+    status.className = "status-msg loading";
 
     const key = 'scp-live-a212e4678fcb47478232abf053202ddb';
     
-    // Configurazione AGGRESSIVA per DoYouSpain
-    const api = `https://api.scrapfly.io/scrape?key=${key}` +
-                `&url=${encodeURIComponent(urlInput.value)}` +
-                `&render_js=true` +
-                `&asp=true` + 
-                `&proxy_pool=public_residential` +
-                `&country=it` +
-                `&render_js_timeout=30000` +
-                `&wait_for_selector=.car-result-card`;
+    // Configurazione ESTREMA per DoYouSpain
+    const params = new URLSearchParams({
+        key: key,
+        url: input.value,
+        render_js: true,
+        asp: true,
+        proxy_pool: 'public_residential',
+        country: 'it',
+        wait_for_selector: '.car-result-card, .price-value, .total-price', // Aspetta che appaia almeno un prezzo
+        headers: 'User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    });
 
     try {
-        const response = await fetch(api);
+        const response = await fetch("https://api.scrapfly.io/scrape?" + params.toString());
         const data = await response.json();
 
-        if (data.status === "error") {
-            throw new Error(data.error?.message || "Errore Scrapfly");
-        }
+        if (data.status === "error") throw new Error("Scrapfly Block: " + data.error.message);
 
         const parser = new DOMParser();
         const doc = parser.parseFromString(data.content, 'text/html');
         
-        // Selettori specifici per la struttura attuale di DoYouSpain
-        const cards = doc.querySelectorAll('.car-result-card, [class*="result-card"]');
-        let prezzi = [];
+        // Nuova ricerca prezzi basata sulla struttura invisibile del sito
+        const items = doc.querySelectorAll('.car-result-card, [class*="result-card"], [class*="car-item"]');
+        let results = [];
 
-        cards.forEach(c => {
-            const nome = c.querySelector('.car-name, h3, .vehicle-name')?.innerText || "Auto";
-            const pText = c.querySelector('.price-value, .total-price, .amount')?.innerText || "0";
+        items.forEach(item => {
+            const nome = item.querySelector('.car-name, h3, [class*="name"]')?.innerText || "Auto";
+            const pText = item.querySelector('.price-value, .total-price, .amount, [class*="price"]')?.innerText || "0";
             const pNum = parseFloat(pText.replace(/[^0-9.,]/g, '').replace(',', '.'));
-            if(pNum > 0) prezzi.push({n: nome.trim(), p: pNum});
+            if(pNum > 5) results.push({n: nome.trim(), p: pNum});
         });
 
-        if(prezzi.length > 0) {
-            prezzi.sort((a,b) => a.p - b.p);
+        if(results.length > 0) {
+            results.sort((a,b) => a.p - b.p);
             tbody.innerHTML = '';
-            prezzi.forEach(x => {
-                tbody.innerHTML += `<tr><td>${x.n}</td><td class="price">${x.p.toFixed(2)} €</td></tr>`;
+            results.forEach(r => {
+                tbody.innerHTML += `<tr><td>${r.n}</td><td class="price">${r.p.toFixed(2)} €</td></tr>`;
             });
-            statusBox.className = "status info";
-            statusBox.style.backgroundColor = "#e8f5e9";
-            statusBox.style.color = "#2e7d32";
-            statusBox.innerText = `Successo! Trovate ${prezzi.length} offerte.`;
+            status.innerText = `Scansione completata! Trovati ${results.length} competitor.`;
+            status.style.color = "#28a745";
         } else {
-            statusBox.className = "status error";
-            statusBox.innerText = "Nessun dato trovato. L'URL potrebbe essere scaduto o la pagina non ha caricato i risultati.";
+            status.className = "status-msg error";
+            status.innerText = "DoYouSpain ha bloccato il bot. Prova a rinfrescare la pagina di DoYouSpain e copia un nuovo URL.";
         }
     } catch (e) {
-        console.error(e);
-        statusBox.className = "status error";
-        statusBox.innerText = "Errore: " + e.message + ". Verifica i crediti su Scrapfly o riprova.";
+        status.className = "status-msg error";
+        status.innerText = "Errore critico: " + e.message;
     } finally {
         btn.disabled = false;
-        btn.innerText = "AGGIORNA PREZZI";
+        btn.innerText = "SCANSIONA PREZZI";
     }
 }
 </script>
+
 </body>
 </html>
