@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Welcome Cars - Price Intelligence v2.1</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+        *{box-sizing:border-box;margin:0;padding:0;}
+        body{background:#F0F0F0;font-family:'Inter',sans-serif;font-size:13px;padding:20px;color:#1A1A1A;}
+        .card{background:#fff;border:1px solid #D8D8D8;border-radius:8px;max-width:900px;margin:0 auto;box-shadow:0 2px 10px rgba(0,0,0,0.05);overflow:hidden;}
+        .topbar{background:#1A1A1A;color:white;padding:10px 20px;display:flex;justify-content:space-between;align-items:center;}
+        .wc-logo{background:#E8311A;padding:4px 10px;border-radius:3px;font-weight:600;font-size:12px;}
+        .main-content{padding:20px;}
+        .url-section{background:#F9F9F9;padding:15px;border-radius:6px;border:1px solid #EEE;margin-bottom:20px;}
+        .url-input-group{display:flex;gap:10px;margin-top:10px;}
+        input[type="text"]{flex:1;padding:12px;border:1px solid #DDD;border-radius:4px;outline:none;font-size:13px;}
+        .btn{padding:10px 20px;border-radius:4px;border:none;cursor:pointer;font-weight:600;transition:0.2s;text-transform:uppercase;font-size:11px;}
+        .btn-green{background:#28a745;color:white;}
+        .btn-green:hover{background:#218838;}
+        .grid{display:grid;grid-template-columns: 1fr 280px;gap:20px;}
+        table{width:100%;border-collapse:collapse;background:white;}
+        th{text-align:left;color:#888;font-size:11px;text-transform:uppercase;padding:12px;border-bottom:1px solid #EEE;}
+        td{padding:12px;border-bottom:1px solid #F9F9F9;}
+        .price-val{font-weight:600;font-size:15px;color:#1A1A1A;}
+        .stats-panel{background:#F8F9FA;padding:15px;border-radius:6px;border:1px solid #EEE;height:fit-content;}
+        .stat-item{margin-bottom:15px;}
+        .stat-label{font-size:11px;color:#666;display:block;margin-bottom:4px;}
+        .stat-value{font-size:18px;font-weight:600;color:#E8311A;}
+        .toast{position:fixed;bottom:20px;right:20px;background:#1A1A1A;color:white;padding:12px 24px;border-radius:4px;display:none;z-index:1000;box-shadow:0 4px 12px rgba(0,0,0,0.2);}
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div class="topbar">
+        <div style="display:flex; align-items:center; gap:10px;">
+            <div class="wc-logo">WELCOME CARS</div>
+            <span style="font-size:11px; color:#999;">Price Intelligence v2.1</span>
+        </div>
+        <div id="currentDate" style="font-size:11px; color:#999;"></div>
+    </div>
+
+    <div class="main-content">
+        <div class="url-section">
+            <strong style="font-size:12px;">Sincronizzazione DoYouSpain</strong>
+            <div class="url-input-group">
+                <input type="text" id="urlInput" placeholder="Incolla l'URL della ricerca (es. Alghero)...">
+                <button onclick="avviaRicerca()" class="btn btn-green">Aggiorna Prezzi</button>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Modello Competitor</th>
+                            <th>Prezzo Totale</th>
+                            <th>Al Giorno</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabella">
+                        <tr><td colspan="3" style="text-align:center; color:#999; padding:40px;">Incolla l'URL e clicca su Aggiorna.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="stats-panel">
+                <div class="stat-item">
+                    <span class="stat-label">Minimo Mercato</span>
+                    <div id="minPrice" class="stat-value">0.00 €</div>
+                </div>
+                <hr style="margin:15px 0; border:0; border-top:1px solid #DDD;">
+                <div class="stat-item">
+                    <span class="stat-label">PREZZO SUGGERITO WC</span>
+                    <div id="suggestedPrice" style="font-size:22px; color:#28a745; font-weight:700;">0.00 €</div>
+                    <small style="color:#666;">(-5% rispetto al minimo)</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const SCRAPFLY_KEY = 'scp-live-a212e4678fcb47478232abf053202ddb';
+
+// Data odierna
+document.getElementById('currentDate').innerText = new Date().toLocaleDateString('it-IT', {day:'numeric', month:'long', year:'numeric'});
+
+function toast(msg) {
+    const t = document.getElementById('toast');
+    t.innerText = msg;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 4000);
+}
+
+async function avviaRicerca() {
+    const target = document.getElementById('urlInput').value;
+    if(!target || !target.includes('doyouspain.com')) {
+        return alert("Inserisci un URL valido di DoYouSpain!");
+    }
+
+    toast("Connessione profonda... Attendi circa 30-40 secondi.");
+
+    // Configurazione con timeout lungo e proxy residenziali
+    const api = `https://api.scrapfly.io/scrape?key=${SCRAPFLY_KEY}&url=${encodeURIComponent(target)}&render_js=true&asp=true&proxy_pool=public_residential&timeout=60000`;
+
+    try {
+        const res = await fetch(api);
+        
+        if (!res.ok) {
+            throw new Error("Risposta server non valida");
+        }
+
+        const json = await res.json();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(json.content, 'text/html');
+        
+        // Selettori aggiornati per DoYouSpain
+        const cards = doc.querySelectorAll('.car-result-card, [class*="result-card"], .te-result-card');
+        let lista = [];
+
+        cards.forEach(c => {
+            const nome = c.querySelector('.car-name, h3, [class*="name"]')?.innerText || "Auto Competitor";
+            const prezzoT = c.querySelector('.price-value, .total-price, .price')?.innerText || "0";
+            const prezzoN = parseFloat(prezzoT.replace(/[^0-9.,]/g, '').replace(',', '.'));
+            
+            if(prezzoN > 0) {
+                lista.push({n: nome.trim(), p: prezzoN});
+            }
+        });
+
+        if(lista.length === 0) {
+            toast("Dati non estratti. Riprova con un nuovo URL.");
+        } else {
+            render(lista);
+            toast("Sincronizzazione completata con successo!");
+        }
+
+    } catch (e) {
+        console.error(e);
+        alert("Errore tecnico. Assicurati che l'estensione CORS sia ATTIVA.");
+    }
+}
+
+function render(lista) {
+    const tbody = document.getElementById('tabella');
+    tbody.innerHTML = '';
+    
+    // Ordina dal più economico
+    lista.sort((a, b) => a.p - b.p);
+
+    lista.forEach(item => {
+        tbody.innerHTML += `
+            <tr>
+                <td>${item.n}</td>
+                <td class="price-val">${item.p.toFixed(2)} €</td>
+                <td style="color:#666;">${(item.p / 7).toFixed(2)} €/gg</td>
+            </tr>`;
+    });
+
+    const min = lista[0].p;
+    document.getElementById('minPrice').innerText = min.toFixed(2) + " €";
+    document.getElementById('suggestedPrice').innerText = (min * 0.95).toFixed(2) + " €";
+}
+</script>
+
+</body>
+</html>
