@@ -3,17 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Welcome Cars - Dashboard</title>
+    <title>WC - Dashboard Live</title>
     <style>
-        body{font-family:sans-serif; background:#f4f4f4; padding:20px; color:#333;}
+        body{font-family:sans-serif; background:#f4f4f4; padding:20px; color:#333; line-height:1.4;}
         .card{background:#fff; max-width:800px; margin:0 auto; padding:20px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.1);}
-        .header{border-bottom:2px solid #E8311A; margin-bottom:20px; padding-bottom:10px; display:flex; justify-content:space-between;}
-        input{width:70%; padding:10px; border:1px solid #ccc; border-radius:4px;}
-        button{padding:10px 20px; background:#28a745; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;}
-        table{width:100%; border-collapse:collapse; margin-top:20px;}
+        .header{border-bottom:2px solid #E8311A; margin-bottom:20px; padding-bottom:10px; display:flex; justify-content:space-between; align-items:center;}
+        .input-group{display:flex; gap:10px; margin-bottom:20px;}
+        input{flex:1; padding:12px; border:1px solid #ccc; border-radius:4px; font-size:14px;}
+        button{padding:12px 24px; background:#28a745; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition: 0.3s;}
+        button:hover{background:#218838;}
+        button:disabled{background:#ccc; cursor:not-allowed;}
+        table{width:100%; border-collapse:collapse; margin-top:20px; background: white;}
         th, td{text-align:left; padding:12px; border-bottom:1px solid #eee;}
+        th{background:#f8f9fa; font-size:12px; color:#666; text-transform:uppercase;}
         .price{font-weight:bold; color:#E8311A;}
-        .suggested{background:#e8f5e9; padding:15px; border-radius:5px; margin-top:20px; border:1px solid #c8e6c9;}
+        .status{padding:10px; border-radius:4px; margin-bottom:10px; display:none; font-size:13px;}
+        .info{background:#e3f2fd; color:#0d47a1; display:block;}
+        .error{background:#ffebee; color:#c62828;}
     </style>
 </head>
 <body>
@@ -21,71 +27,102 @@
 <div class="card">
     <div class="header">
         <h2 style="color:#E8311A; margin:0;">WELCOME CARS</h2>
-        <span>Price Intelligence</span>
+        <span style="font-size:12px; color:#666;">v3.0 Live Deep Engine</span>
     </div>
 
-    <div style="display:flex; gap:10px;">
-        <input type="text" id="urlInput" placeholder="Incolla URL DoYouSpain...">
-        <button onclick="analizza()">AGGIORNA</button>
+    <div id="statusBox" class="status info">Pronto per l'analisi.</div>
+
+    <div class="input-group">
+        <input type="text" id="urlInput" placeholder="Incolla qui l'URL di DoYouSpain (es. do/list/en?...)">
+        <button id="btnAvvia" onclick="analizza()">AGGIORNA PREZZI</button>
     </div>
 
     <table id="risultati">
         <thead>
             <tr>
-                <th>Auto Competitor</th>
-                <th>Prezzo</th>
+                <th>Modello Trovato</th>
+                <th>Prezzo Totale</th>
             </tr>
         </thead>
         <tbody>
-            <tr><td colspan="2" style="text-align:center; padding:20px; color:#999;">Inserisci un URL per iniziare</td></tr>
+            <tr><td colspan="2" style="text-align:center; padding:40px; color:#999;">Incolla l'URL e clicca sul tasto verde.</td></tr>
         </tbody>
     </table>
-
-    <div id="suggerimento" class="suggested" style="display:none;">
-        <strong>PREZZO SUGGERITO WELCOME CARS: </strong>
-        <span id="finalPrice" style="font-size:20px; color:#28a745;">-</span>
-    </div>
 </div>
 
 <script>
 async function analizza() {
-    const url = document.getElementById('urlInput').value;
-    if(!url) return alert("Incolla un URL!");
-    
+    const urlInput = document.getElementById('urlInput');
+    const btn = document.getElementById('btnAvvia');
+    const statusBox = document.getElementById('statusBox');
+    const tbody = document.querySelector('#risultati tbody');
+
+    if(!urlInput.value.includes('doyouspain.com')) {
+        return alert("L'URL non sembra essere di DoYouSpain!");
+    }
+
+    // Reset UI
+    btn.disabled = true;
+    btn.innerText = "ELABORAZIONE...";
+    statusBox.style.display = "block";
+    statusBox.className = "status info";
+    statusBox.innerText = "Connessione profonda con bypass anti-bot in corso... (può richiedere 30-40 secondi)";
+
     const key = 'scp-live-a212e4678fcb47478232abf053202ddb';
-    const api = `https://api.scrapfly.io/scrape?key=${key}&url=${encodeURIComponent(url)}&render_js=true&asp=true&proxy_pool=public_residential`;
+    
+    // Configurazione AGGRESSIVA per DoYouSpain
+    const api = `https://api.scrapfly.io/scrape?key=${key}` +
+                `&url=${encodeURIComponent(urlInput.value)}` +
+                `&render_js=true` +
+                `&asp=true` + 
+                `&proxy_pool=public_residential` +
+                `&country=it` +
+                `&render_js_timeout=30000` +
+                `&wait_for_selector=.car-result-card`;
 
     try {
         const response = await fetch(api);
         const data = await response.json();
+
+        if (data.status === "error") {
+            throw new Error(data.error?.message || "Errore Scrapfly");
+        }
+
         const parser = new DOMParser();
         const doc = parser.parseFromString(data.content, 'text/html');
         
+        // Selettori specifici per la struttura attuale di DoYouSpain
         const cards = doc.querySelectorAll('.car-result-card, [class*="result-card"]');
         let prezzi = [];
 
         cards.forEach(c => {
-            const nome = c.querySelector('.car-name, h3')?.innerText || "Auto";
-            const pText = c.querySelector('.price-value, .total-price')?.innerText || "0";
+            const nome = c.querySelector('.car-name, h3, .vehicle-name')?.innerText || "Auto";
+            const pText = c.querySelector('.price-value, .total-price, .amount')?.innerText || "0";
             const pNum = parseFloat(pText.replace(/[^0-9.,]/g, '').replace(',', '.'));
-            if(pNum > 0) prezzi.push({n: nome, p: pNum});
+            if(pNum > 0) prezzi.push({n: nome.trim(), p: pNum});
         });
 
         if(prezzi.length > 0) {
             prezzi.sort((a,b) => a.p - b.p);
-            const tbody = document.querySelector('#risultati tbody');
             tbody.innerHTML = '';
             prezzi.forEach(x => {
                 tbody.innerHTML += `<tr><td>${x.n}</td><td class="price">${x.p.toFixed(2)} €</td></tr>`;
             });
-            
-            document.getElementById('suggerimento').style.display = 'block';
-            document.getElementById('finalPrice').innerText = (prezzi[0].p * 0.95).toFixed(2) + " €";
+            statusBox.className = "status info";
+            statusBox.style.backgroundColor = "#e8f5e9";
+            statusBox.style.color = "#2e7d32";
+            statusBox.innerText = `Successo! Trovate ${prezzi.length} offerte.`;
         } else {
-            alert("Nessun prezzo trovato. Verifica l'URL.");
+            statusBox.className = "status error";
+            statusBox.innerText = "Nessun dato trovato. L'URL potrebbe essere scaduto o la pagina non ha caricato i risultati.";
         }
     } catch (e) {
-        alert("Errore nella ricerca. Riprova.");
+        console.error(e);
+        statusBox.className = "status error";
+        statusBox.innerText = "Errore: " + e.message + ". Verifica i crediti su Scrapfly o riprova.";
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "AGGIORNA PREZZI";
     }
 }
 </script>
